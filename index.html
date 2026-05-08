@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shopify Comparison Tool</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="tool-shell">
+      <section class="comparison-tool">
+        <div class="comparison-tool-layout">
+          <div class="comparison-tool-panel comparison-tool-editor">
+            <div class="comparison-tool-head">
+              <div>
+                <p class="comparison-tool-kicker">Editor</p>
+                <h1>Update names and rows.</h1>
+                <p class="comparison-tool-note">
+                  Best: use a Shopify file URL. Local upload will auto-compress.
+                </p>
+              </div>
+              <div class="comparison-tool-actions">
+                <button class="ghost-button" type="button" id="comparison-add-row">Add row</button>
+                <button class="ghost-button" type="button" id="comparison-reset">Reset sample</button>
+              </div>
+            </div>
+
+            <div class="comparison-tool-settings" id="comparison-settings"></div>
+            <div class="comparison-tool-columns" id="comparison-columns"></div>
+            <div class="comparison-tool-rows" id="comparison-rows"></div>
+          </div>
+
+          <div class="comparison-tool-panel comparison-tool-preview">
+            <div class="comparison-tool-head">
+              <div>
+                <p class="comparison-tool-kicker">Preview</p>
+                <h2>See the table live and copy Shopify HTML.</h2>
+              </div>
+              <span class="comparison-tool-status" id="comparison-status">Ready</span>
+            </div>
+
+            <div class="comparison-preview-shell">
+              <div id="comparison-preview"></div>
+            </div>
+
+            <div class="comparison-output">
+              <div class="comparison-output-head">
+                <strong>Shopify snippet</strong>
+                <button class="copy-button" type="button" id="comparison-copy">Copy snippet</button>
+              </div>
+              <textarea
+                id="comparison-output"
+                readonly
+                spellcheck="false"
+                aria-label="Shopify comparison snippet output"
+              ></textarea>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
