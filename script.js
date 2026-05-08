@@ -3,6 +3,7 @@ const comparisonRows = document.querySelector("#comparison-rows");
 const comparisonSettings = document.querySelector("#comparison-settings");
 const comparisonPreview = document.querySelector("#comparison-preview");
 const comparisonOutput = document.querySelector("#comparison-output");
+const comparisonJpgResult = document.querySelector("#comparison-jpg-result");
 const comparisonStatus = document.querySelector("#comparison-status");
 const comparisonAddRow = document.querySelector("#comparison-add-row");
 const comparisonReset = document.querySelector("#comparison-reset");
@@ -415,6 +416,23 @@ const copySnippet = async () => {
   }
 };
 
+const showJpgResult = (dataUrl) => {
+  comparisonJpgResult.hidden = false;
+  comparisonJpgResult.innerHTML = `
+    <img src="${dataUrl}" alt="Exported comparison table JPG preview" />
+    <a href="${dataUrl}" download="comparison-table.jpg">Download JPG</a>
+  `;
+};
+
+const downloadDataUrl = (dataUrl) => {
+  const link = document.createElement("a");
+  link.href = dataUrl;
+  link.download = "comparison-table.jpg";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+
 const loadCanvasImage = (src) =>
   new Promise((resolve) => {
     if (!src) {
@@ -662,25 +680,11 @@ const exportJpg = async () => {
 
   try {
     const canvas = await renderJpgToCanvas();
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) {
-          setStatus("Export failed");
-          return;
-        }
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
 
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = "comparison-table.jpg";
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(link.href);
-        setStatus("JPG exported");
-      },
-      "image/jpeg",
-      0.92
-    );
+    showJpgResult(dataUrl);
+    downloadDataUrl(dataUrl);
+    setStatus("JPG ready");
   } catch {
     setStatus("Export failed");
   }

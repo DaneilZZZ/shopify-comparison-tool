@@ -330,6 +330,37 @@ textarea {
   line-height: 1.6;
 }
 
+.comparison-jpg-result {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.comparison-jpg-result[hidden] {
+  display: none;
+}
+
+.comparison-jpg-result img {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.comparison-jpg-result a {
+  justify-self: start;
+  min-height: 42px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  color: #fff;
+  background: #213628;
+  text-decoration: none;
+}
+
 .hb-compare,
 .hb-compare * {
   box-sizing: border-box;
