@@ -13,7 +13,7 @@ const comparisonExportJpg = document.querySelector("#comparison-export-jpg");
 const createDefaults = () => ({
   appearance: {
     featuredStyle: "raised",
-    exportSize: "wide",
+    exportSize: "hd",
     theme: "warm",
     lineStyle: "soft",
   },
@@ -105,10 +105,11 @@ const getColumnImage = (column) => (column.imageUrl || "").trim() || column.imag
 const getFeaturedClassName = () =>
   `hb-compare__featured hb-compare__featured--${state.appearance.featuredStyle}`;
 const exportSizes = {
+  hd: { width: 1920, height: 1080, label: "1920x1080" },
   wide: { width: 1464, height: 600, label: "1464x600" },
   compact: { width: 600, height: 450, label: "600x450" },
 };
-const getExportSize = () => exportSizes[state.appearance.exportSize] || exportSizes.wide;
+const getExportSize = () => exportSizes[state.appearance.exportSize] || exportSizes.hd;
 const themes = {
   warm: {
     label: "Warm Studio",
@@ -352,6 +353,7 @@ const renderSettings = () => {
     <div class="comparison-field">
       <label for="export-size">JPG export size</label>
       <select id="export-size" data-action="export-size">
+        <option value="hd" ${state.appearance.exportSize === "hd" ? "selected" : ""}>1920 x 1080 (1080P)</option>
         <option value="wide" ${state.appearance.exportSize === "wide" ? "selected" : ""}>1464 x 600</option>
         <option value="compact" ${state.appearance.exportSize === "compact" ? "selected" : ""}>600 x 450</option>
       </select>
@@ -695,25 +697,26 @@ const drawStatusIcon = (context, x, y, type, radius) => {
 };
 
 const renderJpgToCanvas = async (targetSize = getExportSize()) => {
-  const scale = 2;
+  const scale = 1;
   const theme = getTheme();
   const isCompact = targetSize.width <= 700;
-  const paddingX = isCompact ? 18 : 48;
-  const paddingY = isCompact ? 16 : 26;
+  const isHd = targetSize.width >= 1800;
+  const paddingX = isCompact ? 18 : isHd ? 72 : 48;
+  const paddingY = isCompact ? 16 : isHd ? 54 : 26;
   const tableWidth = targetSize.width - paddingX * 2;
   const tableHeight = targetSize.height - paddingY * 2;
-  const headerHeight = clamp(tableHeight * 0.2, isCompact ? 78 : 100, isCompact ? 92 : 118);
+  const headerHeight = clamp(tableHeight * (isHd ? 0.24 : 0.2), isCompact ? 78 : isHd ? 190 : 100, isCompact ? 92 : isHd ? 230 : 118);
   const rowHeight = (tableHeight - headerHeight) / Math.max(state.rows.length, 1);
   const labelWidth = Math.round(tableWidth * (isCompact ? 0.31 : 0.28));
   const columnWidth = (tableWidth - labelWidth) / state.columns.length;
-  const cornerRadius = isCompact ? 16 : 28;
-  const lineInset = isCompact ? 10 : 30;
-  const iconRadius = isCompact ? 8 : 20;
-  const headerFont = isCompact ? "700 10px Arial, sans-serif" : "700 23px Arial, sans-serif";
-  const labelFont = isCompact ? "700 10px Arial, sans-serif" : "700 20px Arial, sans-serif";
-  const valueFont = isCompact ? "700 10px Arial, sans-serif" : "700 21px Arial, sans-serif";
-  const headerLineHeight = isCompact ? 13 : 31;
-  const valueLineHeight = isCompact ? 12 : 25;
+  const cornerRadius = isCompact ? 16 : isHd ? 36 : 28;
+  const lineInset = isCompact ? 10 : isHd ? 38 : 30;
+  const iconRadius = isCompact ? 8 : isHd ? 26 : 20;
+  const headerFont = isCompact ? "700 10px Arial, sans-serif" : isHd ? "700 30px Arial, sans-serif" : "700 23px Arial, sans-serif";
+  const labelFont = isCompact ? "700 10px Arial, sans-serif" : isHd ? "700 26px Arial, sans-serif" : "700 20px Arial, sans-serif";
+  const valueFont = isCompact ? "700 10px Arial, sans-serif" : isHd ? "700 28px Arial, sans-serif" : "700 21px Arial, sans-serif";
+  const headerLineHeight = isCompact ? 13 : isHd ? 38 : 31;
+  const valueLineHeight = isCompact ? 12 : isHd ? 32 : 25;
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
   const images = await Promise.all(state.columns.map((column) => loadCanvasImage(getColumnImage(column))));
@@ -761,9 +764,9 @@ const renderJpgToCanvas = async (targetSize = getExportSize()) => {
     const x = paddingX + labelWidth + index * columnWidth;
     const centerX = x + columnWidth / 2;
     const image = images[index];
-    const imageSize = isCompact ? 26 : 54;
-    const imageTop = paddingY + (isCompact ? 10 : 18);
-    const nameTop = image ? imageTop + imageSize + (isCompact ? 7 : 14) : paddingY + headerHeight / 2;
+    const imageSize = isCompact ? 26 : isHd ? 96 : 54;
+    const imageTop = paddingY + (isCompact ? 10 : isHd ? 24 : 18);
+    const nameTop = image ? imageTop + imageSize + (isCompact ? 7 : isHd ? 20 : 14) : paddingY + headerHeight / 2;
 
     if (image) {
       const imgX = centerX - imageSize / 2;
@@ -827,17 +830,7 @@ const renderJpgToCanvas = async (targetSize = getExportSize()) => {
   });
 
   context.restore();
-  const outputCanvas = document.createElement("canvas");
-  const outputContext = outputCanvas.getContext("2d");
-  outputCanvas.width = targetSize.width;
-  outputCanvas.height = targetSize.height;
-  if (!outputContext) {
-    return canvas;
-  }
-  outputContext.imageSmoothingEnabled = true;
-  outputContext.imageSmoothingQuality = "high";
-  outputContext.drawImage(canvas, 0, 0, targetSize.width, targetSize.height);
-  return outputCanvas;
+  return canvas;
 };
 
 const exportJpg = async () => {
@@ -847,7 +840,7 @@ const exportJpg = async () => {
     const exportSize = getExportSize();
     const filename = `comparison-table-${exportSize.label}.jpg`;
     const canvas = await renderJpgToCanvas(exportSize);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.96);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.98);
 
     showJpgResult(dataUrl, filename);
     downloadDataUrl(dataUrl, filename);
@@ -867,7 +860,7 @@ const compressImageFile = (file) =>
 
       image.onerror = () => reject(new Error("image-load-failed"));
       image.onload = () => {
-        const maxSize = 240;
+        const maxSize = 720;
         const ratio = Math.min(maxSize / image.width, maxSize / image.height, 1);
         const width = Math.max(1, Math.round(image.width * ratio));
         const height = Math.max(1, Math.round(image.height * ratio));
@@ -883,7 +876,7 @@ const compressImageFile = (file) =>
         canvas.height = height;
         context.clearRect(0, 0, width, height);
         context.drawImage(image, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/webp", 0.84));
+        resolve(canvas.toDataURL("image/webp", 0.9));
       };
 
       image.src = typeof reader.result === "string" ? reader.result : "";
