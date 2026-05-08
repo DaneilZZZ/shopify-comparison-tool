@@ -14,6 +14,8 @@ const createDefaults = () => ({
   appearance: {
     featuredStyle: "raised",
     exportSize: "wide",
+    theme: "warm",
+    lineStyle: "soft",
   },
   columns: [
     { name: "Havnby FlatCore", tone: "normal", imageUrl: "", imageData: "" },
@@ -107,6 +109,92 @@ const exportSizes = {
   compact: { width: 600, height: 450, label: "600x450" },
 };
 const getExportSize = () => exportSizes[state.appearance.exportSize] || exportSizes.wide;
+const themes = {
+  warm: {
+    label: "Warm Studio",
+    pageStart: "#f6f1e8",
+    pageEnd: "#f6f1e8",
+    card: "#ffffff",
+    line: "#ddd2c2",
+    text: "#25211c",
+    muted: "#80786e",
+    featured: "#fffefd",
+    featuredSoft: "#efe7d9",
+    featuredStroke: "rgba(196,178,148,0.52)",
+    yes: "#648b2b",
+    no: "#b53030",
+    shadow: "rgba(82,64,36,0.12)",
+  },
+  apple: {
+    label: "Apple Frost",
+    pageStart: "#f5f5f7",
+    pageEnd: "#eef2f7",
+    card: "#ffffff",
+    line: "#d7dce5",
+    text: "#1d1d1f",
+    muted: "#6e6e73",
+    featured: "#fbfdff",
+    featuredSoft: "#eef5ff",
+    featuredStroke: "rgba(143,157,180,0.46)",
+    yes: "#557f2d",
+    no: "#b93236",
+    shadow: "rgba(29,29,31,0.12)",
+  },
+  glass: {
+    label: "Glass Sand",
+    pageStart: "#f7f2e8",
+    pageEnd: "#e8edf0",
+    card: "rgba(255,255,255,0.82)",
+    line: "#d8cec0",
+    text: "#211f1b",
+    muted: "#777268",
+    featured: "rgba(255,255,255,0.68)",
+    featuredSoft: "rgba(255,255,255,0.5)",
+    featuredStroke: "rgba(255,255,255,0.72)",
+    yes: "#5f872d",
+    no: "#bd3436",
+    shadow: "rgba(74,64,46,0.16)",
+  },
+  graphite: {
+    label: "Graphite Lines",
+    pageStart: "#f4f4f1",
+    pageEnd: "#ece9e1",
+    card: "#fcfbf7",
+    line: "#c7c3b8",
+    text: "#202020",
+    muted: "#74706a",
+    featured: "#f7f7f1",
+    featuredSoft: "#ebe8de",
+    featuredStroke: "rgba(129,124,112,0.42)",
+    yes: "#527e31",
+    no: "#ad3030",
+    shadow: "rgba(34,34,28,0.13)",
+  },
+};
+const getTheme = () => themes[state.appearance.theme] || themes.warm;
+const lineStyles = {
+  soft: { label: "Soft hairline", width: 0.75 },
+  standard: { label: "Standard", width: 1 },
+  defined: { label: "Defined", width: 1.35 },
+};
+const getLineStyle = () => lineStyles[state.appearance.lineStyle] || lineStyles.soft;
+const getThemeStyle = () => {
+  const theme = getTheme();
+  const lineStyle = getLineStyle();
+  return [
+    ["line-width", `${lineStyle.width}px`],
+    ["page", `linear-gradient(135deg, ${theme.pageStart}, ${theme.pageEnd})`],
+    ["card", theme.card],
+    ["line", theme.line],
+    ["text", theme.text],
+    ["muted", theme.muted],
+    ["featured", theme.featuredSoft],
+    ["yes", theme.yes],
+    ["no", theme.no],
+  ]
+    .map(([name, value]) => `--${name}:${escapeHtml(value)}`)
+    .join(";");
+};
 
 const escapeHtml = (value) =>
   String(value ?? "")
@@ -120,13 +208,13 @@ const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
 const snippetStyle = `<style>
   .hb-compare,.hb-compare *{box-sizing:border-box}
-  .hb-compare{--card:#ffffff;--line:#ddd2c2;--text:#25211c;--muted:#80786e;--featured:#efe7d9;--yes:#648b2b;--no:#b53030;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-  .hb-compare__card{padding:18px;border-radius:22px;background:var(--card);box-shadow:0 10px 24px rgba(82,64,36,.1)}
+  .hb-compare{--line-width:1px;--page:#f6f1e8;--card:#ffffff;--line:#ddd2c2;--text:#25211c;--muted:#80786e;--featured:#efe7d9;--yes:#648b2b;--no:#b53030;padding:18px;border-radius:28px;background:var(--page);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+  .hb-compare__card{padding:18px;border:1px solid rgba(255,255,255,.7);border-radius:24px;background:var(--card);box-shadow:0 14px 34px rgba(82,64,36,.11)}
   .hb-compare__scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
   .hb-compare__table{width:100%;min-width:760px;border-collapse:separate;border-spacing:0}
   .hb-compare__table th,.hb-compare__table td{padding:14px 16px;text-align:center;vertical-align:middle;font-size:14px}
-  .hb-compare__table thead th{border-bottom:1px solid var(--line)}
-  .hb-compare__table tbody td{border-bottom:1px solid var(--line)}
+  .hb-compare__table thead th{border-bottom:var(--line-width) solid var(--line)}
+  .hb-compare__table tbody td{border-bottom:var(--line-width) solid var(--line)}
   .hb-compare__table tbody tr:last-child td{border-bottom:none}
   .hb-compare__table th:first-child,.hb-compare__table td:first-child{width:220px;text-align:left;color:var(--muted);font-size:13px;font-weight:600}
   .hb-compare__head{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:66px;gap:10px}
@@ -136,9 +224,9 @@ const snippetStyle = `<style>
   .hb-compare__name--muted{color:var(--muted);font-weight:600}
   .hb-compare__featured{background:var(--featured)}
   .hb-compare__featured--warm{background:var(--featured)}
-  .hb-compare__featured--raised{position:relative;z-index:1;background:rgba(255,255,255,.96);border-left:1px solid rgba(196,178,148,.42);border-right:1px solid rgba(196,178,148,.42);box-shadow:0 12px 24px rgba(98,75,42,.12)}
-  .hb-compare__featured--glass{position:relative;z-index:1;background:rgba(255,255,255,.46);border-left:1px solid rgba(255,255,255,.62);border-right:1px solid rgba(255,255,255,.62);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 10px 24px rgba(84,64,36,.08);backdrop-filter:blur(14px)}
-  .hb-compare__featured--clean{background:rgba(255,255,255,.82);border-left:1px solid rgba(221,210,194,.95);border-right:1px solid rgba(221,210,194,.95)}
+  .hb-compare__featured--raised{position:relative;z-index:1;background:var(--card);border-left:var(--line-width) solid var(--line);border-right:var(--line-width) solid var(--line);box-shadow:0 12px 24px rgba(35,35,35,.1)}
+  .hb-compare__featured--glass{position:relative;z-index:1;background:rgba(255,255,255,.46);border-left:var(--line-width) solid rgba(255,255,255,.62);border-right:var(--line-width) solid rgba(255,255,255,.62);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 10px 24px rgba(35,35,35,.08);backdrop-filter:blur(14px)}
+  .hb-compare__featured--clean{background:var(--card);border-left:var(--line-width) solid var(--line);border-right:var(--line-width) solid var(--line)}
   .hb-compare__table thead .hb-compare__featured--raised,.hb-compare__table thead .hb-compare__featured--glass,.hb-compare__table thead .hb-compare__featured--clean{border-top-left-radius:18px;border-top-right-radius:18px}
   .hb-compare__table tbody tr:last-child .hb-compare__featured--raised,.hb-compare__table tbody tr:last-child .hb-compare__featured--glass,.hb-compare__table tbody tr:last-child .hb-compare__featured--clean{border-bottom-left-radius:18px;border-bottom-right-radius:18px}
   .hb-compare__icon{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;color:#fff;font-size:13px;font-weight:700;line-height:1}
@@ -172,7 +260,7 @@ const renderValue = (value) => {
 };
 
 const renderMarkup = () => `
-  <div class="hb-compare">
+  <div class="hb-compare" style="${getThemeStyle()}">
     <div class="hb-compare__card">
       <div class="hb-compare__scroll">
         <table class="hb-compare__table" aria-label="Camp mattress comparison table">
@@ -231,7 +319,17 @@ ${renderMarkup()}`;
 
 const renderSettings = () => {
   comparisonSettings.innerHTML = `
-    <strong>Featured column style</strong>
+    <strong>Table appearance</strong>
+    <div class="comparison-field">
+      <label for="table-theme">Theme</label>
+      <select id="table-theme" data-action="theme">
+        <option value="warm" ${state.appearance.theme === "warm" ? "selected" : ""}>Warm Studio</option>
+        <option value="apple" ${state.appearance.theme === "apple" ? "selected" : ""}>Apple Frost</option>
+        <option value="glass" ${state.appearance.theme === "glass" ? "selected" : ""}>Glass Sand</option>
+        <option value="graphite" ${state.appearance.theme === "graphite" ? "selected" : ""}>Graphite Lines</option>
+      </select>
+      <small>Changes the JPG and Shopify snippet background, line color, and table tone.</small>
+    </div>
     <div class="comparison-field">
       <label for="featured-style">Highlight look</label>
       <select id="featured-style" data-action="featured-style">
@@ -241,6 +339,15 @@ const renderSettings = () => {
         <option value="warm" ${state.appearance.featuredStyle === "warm" ? "selected" : ""}>Warm tint</option>
       </select>
       <small>Pick a quieter look for the key column without removing emphasis.</small>
+    </div>
+    <div class="comparison-field">
+      <label for="line-style">Line detail</label>
+      <select id="line-style" data-action="line-style">
+        <option value="soft" ${state.appearance.lineStyle === "soft" ? "selected" : ""}>Soft hairline</option>
+        <option value="standard" ${state.appearance.lineStyle === "standard" ? "selected" : ""}>Standard</option>
+        <option value="defined" ${state.appearance.lineStyle === "defined" ? "selected" : ""}>Defined</option>
+      </select>
+      <small>Use softer lines for a more premium product-card feel.</small>
     </div>
     <div class="comparison-field">
       <label for="export-size">JPG export size</label>
@@ -522,9 +629,10 @@ const drawCellBackground = (context, x, y, width, height, isFeatured) => {
   }
 
   const style = state.appearance.featuredStyle;
+  const theme = getTheme();
 
   if (style === "warm") {
-    context.fillStyle = "#efe7d9";
+    context.fillStyle = theme.featuredSoft;
     context.fillRect(x, y, width, height);
     return;
   }
@@ -532,37 +640,38 @@ const drawCellBackground = (context, x, y, width, height, isFeatured) => {
   if (style === "glass") {
     const gradient = context.createLinearGradient(x, y, x + width, y + height);
     gradient.addColorStop(0, "rgba(255,255,255,0.78)");
-    gradient.addColorStop(1, "rgba(239,231,217,0.46)");
+    gradient.addColorStop(1, theme.featuredSoft);
     context.fillStyle = gradient;
     context.fillRect(x, y, width, height);
-    context.strokeStyle = "rgba(255,255,255,0.85)";
+    context.strokeStyle = theme.featuredStroke;
     context.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
     return;
   }
 
   if (style === "clean") {
-    context.fillStyle = "#fbfaf7";
+    context.fillStyle = theme.card;
     context.fillRect(x, y, width, height);
-    context.strokeStyle = "#e0d6c7";
+    context.strokeStyle = theme.line;
     context.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
     return;
   }
 
   context.save();
-  context.shadowColor = "rgba(98,75,42,0.16)";
+  context.shadowColor = theme.shadow;
   context.shadowBlur = 18;
   context.shadowOffsetY = 8;
-  context.fillStyle = "#fffefd";
+  context.fillStyle = theme.featured;
   context.fillRect(x + 2, y, width - 4, height);
   context.restore();
-  context.strokeStyle = "rgba(196,178,148,0.52)";
+  context.strokeStyle = theme.featuredStroke;
   context.strokeRect(x + 2.5, y + 0.5, width - 5, height - 1);
 };
 
 const drawStatusIcon = (context, x, y, type, radius) => {
   context.beginPath();
   context.arc(x, y, radius, 0, Math.PI * 2);
-  context.fillStyle = type === "yes" ? "#648b2b" : "#b53030";
+  const theme = getTheme();
+  context.fillStyle = type === "yes" ? theme.yes : theme.no;
   context.fill();
 
   context.strokeStyle = "#ffffff";
@@ -586,7 +695,8 @@ const drawStatusIcon = (context, x, y, type, radius) => {
 };
 
 const renderJpgToCanvas = async (targetSize = getExportSize()) => {
-  const scale = 1;
+  const scale = 2;
+  const theme = getTheme();
   const isCompact = targetSize.width <= 700;
   const paddingX = isCompact ? 18 : 48;
   const paddingY = isCompact ? 16 : 26;
@@ -611,15 +721,18 @@ const renderJpgToCanvas = async (targetSize = getExportSize()) => {
   canvas.width = targetSize.width * scale;
   canvas.height = targetSize.height * scale;
   context.scale(scale, scale);
-  context.fillStyle = "#f6f1e8";
+  const pageGradient = context.createLinearGradient(0, 0, targetSize.width, targetSize.height);
+  pageGradient.addColorStop(0, theme.pageStart);
+  pageGradient.addColorStop(1, theme.pageEnd);
+  context.fillStyle = pageGradient;
   context.fillRect(0, 0, targetSize.width, targetSize.height);
 
   context.save();
-  context.shadowColor = "rgba(82,64,36,0.10)";
+  context.shadowColor = theme.shadow;
   context.shadowBlur = isCompact ? 14 : 26;
   context.shadowOffsetY = isCompact ? 6 : 10;
   drawRoundRect(context, paddingX, paddingY, tableWidth, tableHeight, cornerRadius);
-  context.fillStyle = "#ffffff";
+  context.fillStyle = theme.card;
   context.fill();
   context.restore();
 
@@ -633,8 +746,8 @@ const renderJpgToCanvas = async (targetSize = getExportSize()) => {
     drawCellBackground(context, x, paddingY, columnWidth, tableHeight, isFeatured);
   });
 
-  context.strokeStyle = "#ddd2c2";
-  context.lineWidth = 1;
+  context.strokeStyle = theme.line;
+  context.lineWidth = getLineStyle().width;
 
   for (let rowIndex = 0; rowIndex <= state.rows.length; rowIndex += 1) {
     const y = paddingY + headerHeight + rowIndex * rowHeight;
@@ -655,8 +768,10 @@ const renderJpgToCanvas = async (targetSize = getExportSize()) => {
     if (image) {
       const imgX = centerX - imageSize / 2;
       drawRoundRect(context, imgX, imageTop, imageSize, imageSize, isCompact ? 7 : 14);
-      context.fillStyle = "#faf7f2";
+      context.fillStyle = theme.featuredSoft;
       context.fill();
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
       const ratio = Math.min(imageSize / image.width, imageSize / image.height);
       const drawWidth = image.width * ratio;
       const drawHeight = image.height * ratio;
@@ -669,7 +784,7 @@ const renderJpgToCanvas = async (targetSize = getExportSize()) => {
       );
     }
 
-    context.fillStyle = column.tone === "muted" ? "#80786e" : "#25211c";
+    context.fillStyle = column.tone === "muted" ? theme.muted : theme.text;
     context.font = headerFont;
     context.textBaseline = image ? "top" : "middle";
     const headerLines = wrapText(context, column.name, columnWidth - (isCompact ? 8 : 26));
@@ -684,7 +799,7 @@ const renderJpgToCanvas = async (targetSize = getExportSize()) => {
     const y = paddingY + headerHeight + rowIndex * rowHeight;
     const centerY = y + rowHeight / 2;
 
-    context.fillStyle = "#80786e";
+    context.fillStyle = theme.muted;
     context.font = labelFont;
     context.textAlign = "left";
     context.textBaseline = "middle";
@@ -699,7 +814,7 @@ const renderJpgToCanvas = async (targetSize = getExportSize()) => {
         return;
       }
 
-      context.fillStyle = value.type === "muted" ? "#80786e" : "#25211c";
+      context.fillStyle = value.type === "muted" ? theme.muted : theme.text;
       context.font = valueFont;
       context.textBaseline = "middle";
       const lines = wrapText(context, value.text, columnWidth - (isCompact ? 8 : 30));
@@ -712,7 +827,17 @@ const renderJpgToCanvas = async (targetSize = getExportSize()) => {
   });
 
   context.restore();
-  return canvas;
+  const outputCanvas = document.createElement("canvas");
+  const outputContext = outputCanvas.getContext("2d");
+  outputCanvas.width = targetSize.width;
+  outputCanvas.height = targetSize.height;
+  if (!outputContext) {
+    return canvas;
+  }
+  outputContext.imageSmoothingEnabled = true;
+  outputContext.imageSmoothingQuality = "high";
+  outputContext.drawImage(canvas, 0, 0, targetSize.width, targetSize.height);
+  return outputCanvas;
 };
 
 const exportJpg = async () => {
@@ -722,7 +847,7 @@ const exportJpg = async () => {
     const exportSize = getExportSize();
     const filename = `comparison-table-${exportSize.label}.jpg`;
     const canvas = await renderJpgToCanvas(exportSize);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.96);
 
     showJpgResult(dataUrl, filename);
     downloadDataUrl(dataUrl, filename);
@@ -742,7 +867,7 @@ const compressImageFile = (file) =>
 
       image.onerror = () => reject(new Error("image-load-failed"));
       image.onload = () => {
-        const maxSize = 72;
+        const maxSize = 240;
         const ratio = Math.min(maxSize / image.width, maxSize / image.height, 1);
         const width = Math.max(1, Math.round(image.width * ratio));
         const height = Math.max(1, Math.round(image.height * ratio));
@@ -758,7 +883,7 @@ const compressImageFile = (file) =>
         canvas.height = height;
         context.clearRect(0, 0, width, height);
         context.drawImage(image, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/webp", 0.78));
+        resolve(canvas.toDataURL("image/webp", 0.84));
       };
 
       image.src = typeof reader.result === "string" ? reader.result : "";
@@ -782,6 +907,14 @@ const handleInput = (event) => {
 
   if (action === "export-size") {
     state.appearance.exportSize = event.target.value;
+  }
+
+  if (action === "theme") {
+    state.appearance.theme = event.target.value;
+  }
+
+  if (action === "line-style") {
+    state.appearance.lineStyle = event.target.value;
   }
 
   if (action === "column-name") {
