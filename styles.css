@@ -315,6 +315,13 @@ textarea {
   font-size: 1.15rem;
 }
 
+.comparison-output-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .comparison-output textarea {
   min-height: 288px;
   padding: 16px;
@@ -535,6 +542,14 @@ textarea {
 
   .comparison-tool-actions {
     flex-direction: column;
+  }
+
+  .comparison-output-actions {
+    justify-content: stretch;
+  }
+
+  .comparison-output-actions button {
+    width: 100%;
   }
 
   .hb-compare__card {

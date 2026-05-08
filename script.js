@@ -7,6 +7,7 @@ const comparisonStatus = document.querySelector("#comparison-status");
 const comparisonAddRow = document.querySelector("#comparison-add-row");
 const comparisonReset = document.querySelector("#comparison-reset");
 const comparisonCopy = document.querySelector("#comparison-copy");
+const comparisonExportJpg = document.querySelector("#comparison-export-jpg");
 
 const createDefaults = () => ({
   appearance: {
@@ -107,6 +108,8 @@ const escapeHtml = (value) =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
 const snippetStyle = `<style>
   .hb-compare,.hb-compare *{box-sizing:border-box}
@@ -412,6 +415,277 @@ const copySnippet = async () => {
   }
 };
 
+const loadCanvasImage = (src) =>
+  new Promise((resolve) => {
+    if (!src) {
+      resolve(null);
+      return;
+    }
+
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = src;
+  });
+
+const wrapText = (context, text, maxWidth) => {
+  const words = String(text || "").split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = "";
+
+  if (!words.length) {
+    return [""];
+  }
+
+  words.forEach((word) => {
+    const nextLine = line ? `${line} ${word}` : word;
+
+    if (context.measureText(nextLine).width <= maxWidth || !line) {
+      line = nextLine;
+      return;
+    }
+
+    lines.push(line);
+    line = word;
+  });
+
+  if (line) {
+    lines.push(line);
+  }
+
+  return lines;
+};
+
+const drawRoundRect = (context, x, y, width, height, radius) => {
+  const safeRadius = clamp(radius, 0, Math.min(width, height) / 2);
+
+  context.beginPath();
+  context.moveTo(x + safeRadius, y);
+  context.lineTo(x + width - safeRadius, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
+  context.lineTo(x + width, y + height - safeRadius);
+  context.quadraticCurveTo(x + width, y + height, x + width - safeRadius, y + height);
+  context.lineTo(x + safeRadius, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
+  context.lineTo(x, y + safeRadius);
+  context.quadraticCurveTo(x, y, x + safeRadius, y);
+  context.closePath();
+};
+
+const drawWrappedText = (context, text, x, y, maxWidth, lineHeight, align = "center") => {
+  const lines = wrapText(context, text, maxWidth);
+  context.textAlign = align;
+
+  lines.forEach((line, index) => {
+    context.fillText(line, x, y + index * lineHeight);
+  });
+
+  return lines.length * lineHeight;
+};
+
+const drawCellBackground = (context, x, y, width, height, isFeatured) => {
+  if (!isFeatured) {
+    return;
+  }
+
+  const style = state.appearance.featuredStyle;
+
+  if (style === "warm") {
+    context.fillStyle = "#efe7d9";
+    context.fillRect(x, y, width, height);
+    return;
+  }
+
+  if (style === "glass") {
+    const gradient = context.createLinearGradient(x, y, x + width, y + height);
+    gradient.addColorStop(0, "rgba(255,255,255,0.78)");
+    gradient.addColorStop(1, "rgba(239,231,217,0.46)");
+    context.fillStyle = gradient;
+    context.fillRect(x, y, width, height);
+    context.strokeStyle = "rgba(255,255,255,0.85)";
+    context.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
+    return;
+  }
+
+  if (style === "clean") {
+    context.fillStyle = "#fbfaf7";
+    context.fillRect(x, y, width, height);
+    context.strokeStyle = "#e0d6c7";
+    context.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
+    return;
+  }
+
+  context.save();
+  context.shadowColor = "rgba(98,75,42,0.16)";
+  context.shadowBlur = 18;
+  context.shadowOffsetY = 8;
+  context.fillStyle = "#fffefd";
+  context.fillRect(x + 2, y, width - 4, height);
+  context.restore();
+  context.strokeStyle = "rgba(196,178,148,0.52)";
+  context.strokeRect(x + 2.5, y + 0.5, width - 5, height - 1);
+};
+
+const drawStatusIcon = (context, x, y, type) => {
+  const radius = 12;
+  context.beginPath();
+  context.arc(x, y, radius, 0, Math.PI * 2);
+  context.fillStyle = type === "yes" ? "#648b2b" : "#b53030";
+  context.fill();
+
+  context.fillStyle = "#ffffff";
+  context.font = "700 15px Arial, sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(type === "yes" ? "✓" : "×", x, y + (type === "yes" ? -1 : 0));
+};
+
+const renderJpgToCanvas = async () => {
+  const scale = 2;
+  const labelWidth = 220;
+  const columnWidth = 150;
+  const padding = 28;
+  const headerHeight = 126;
+  const rowHeight = 64;
+  const tableWidth = labelWidth + state.columns.length * columnWidth;
+  const tableHeight = headerHeight + state.rows.length * rowHeight;
+  const canvasWidth = tableWidth + padding * 2;
+  const canvasHeight = tableHeight + padding * 2;
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  const images = await Promise.all(state.columns.map((column) => loadCanvasImage(getColumnImage(column))));
+
+  canvas.width = canvasWidth * scale;
+  canvas.height = canvasHeight * scale;
+  context.scale(scale, scale);
+  context.fillStyle = "#f6f1e8";
+  context.fillRect(0, 0, canvasWidth, canvasHeight);
+
+  context.save();
+  context.shadowColor = "rgba(82,64,36,0.10)";
+  context.shadowBlur = 22;
+  context.shadowOffsetY = 10;
+  drawRoundRect(context, padding, padding, tableWidth, tableHeight, 22);
+  context.fillStyle = "#ffffff";
+  context.fill();
+  context.restore();
+
+  context.save();
+  drawRoundRect(context, padding, padding, tableWidth, tableHeight, 22);
+  context.clip();
+
+  state.columns.forEach((column, index) => {
+    const x = padding + labelWidth + index * columnWidth;
+    const isFeatured = index === 0;
+    drawCellBackground(context, x, padding, columnWidth, tableHeight, isFeatured);
+  });
+
+  context.strokeStyle = "#ddd2c2";
+  context.lineWidth = 1;
+
+  for (let rowIndex = 0; rowIndex <= state.rows.length; rowIndex += 1) {
+    const y = padding + headerHeight + rowIndex * rowHeight;
+    context.beginPath();
+    context.moveTo(padding + 18, y);
+    context.lineTo(padding + tableWidth - 18, y);
+    context.stroke();
+  }
+
+  state.columns.forEach((column, index) => {
+    const x = padding + labelWidth + index * columnWidth;
+    const centerX = x + columnWidth / 2;
+    const image = images[index];
+
+    if (image) {
+      const imgSize = 52;
+      const imgX = centerX - imgSize / 2;
+      const imgY = padding + 22;
+      drawRoundRect(context, imgX, imgY, imgSize, imgSize, 14);
+      context.fillStyle = "#faf7f2";
+      context.fill();
+      const ratio = Math.min(imgSize / image.width, imgSize / image.height);
+      const drawWidth = image.width * ratio;
+      const drawHeight = image.height * ratio;
+      context.drawImage(
+        image,
+        centerX - drawWidth / 2,
+        imgY + imgSize / 2 - drawHeight / 2,
+        drawWidth,
+        drawHeight
+      );
+    }
+
+    context.fillStyle = column.tone === "muted" ? "#80786e" : "#25211c";
+    context.font = "700 14px Arial, sans-serif";
+    context.textBaseline = "top";
+    drawWrappedText(context, column.name, centerX, padding + (image ? 82 : 48), columnWidth - 26, 18);
+  });
+
+  state.rows.forEach((row, rowIndex) => {
+    const y = padding + headerHeight + rowIndex * rowHeight;
+    const centerY = y + rowHeight / 2;
+
+    context.fillStyle = "#80786e";
+    context.font = "700 13px Arial, sans-serif";
+    context.textAlign = "left";
+    context.textBaseline = "middle";
+    context.fillText(row.label, padding + 18, centerY);
+
+    row.values.forEach((value, valueIndex) => {
+      const x = padding + labelWidth + valueIndex * columnWidth;
+      const centerX = x + columnWidth / 2;
+
+      if (value.type === "yes" || value.type === "no") {
+        drawStatusIcon(context, centerX, centerY, value.type);
+        return;
+      }
+
+      context.fillStyle = value.type === "muted" ? "#80786e" : "#25211c";
+      context.font = "700 14px Arial, sans-serif";
+      context.textBaseline = "middle";
+      const lines = wrapText(context, value.text, columnWidth - 30);
+      const startY = centerY - ((lines.length - 1) * 18) / 2;
+      context.textAlign = "center";
+      lines.forEach((line, index) => {
+        context.fillText(line, centerX, startY + index * 18);
+      });
+    });
+  });
+
+  context.restore();
+  return canvas;
+};
+
+const exportJpg = async () => {
+  setStatus("Exporting");
+
+  try {
+    const canvas = await renderJpgToCanvas();
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          setStatus("Export failed");
+          return;
+        }
+
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "comparison-table.jpg";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(link.href);
+        setStatus("JPG exported");
+      },
+      "image/jpeg",
+      0.92
+    );
+  } catch {
+    setStatus("Export failed");
+  }
+};
+
 const compressImageFile = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -534,5 +808,6 @@ comparisonRows.addEventListener("click", handleClick);
 comparisonAddRow.addEventListener("click", addRow);
 comparisonReset.addEventListener("click", resetTool);
 comparisonCopy.addEventListener("click", copySnippet);
+comparisonExportJpg.addEventListener("click", exportJpg);
 
 renderAll();
