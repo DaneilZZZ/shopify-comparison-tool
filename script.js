@@ -13,6 +13,7 @@ const comparisonExportJpg = document.querySelector("#comparison-export-jpg");
 const createDefaults = () => ({
   appearance: {
     featuredStyle: "raised",
+    exportSize: "wide",
   },
   columns: [
     { name: "Havnby FlatCore", tone: "normal", imageUrl: "", imageData: "" },
@@ -101,6 +102,11 @@ const needsText = (type) => type === "text" || type === "muted";
 const getColumnImage = (column) => (column.imageUrl || "").trim() || column.imageData || "";
 const getFeaturedClassName = () =>
   `hb-compare__featured hb-compare__featured--${state.appearance.featuredStyle}`;
+const exportSizes = {
+  wide: { width: 1464, height: 600, label: "1464x600" },
+  compact: { width: 600, height: 450, label: "600x450" },
+};
+const getExportSize = () => exportSizes[state.appearance.exportSize] || exportSizes.wide;
 
 const escapeHtml = (value) =>
   String(value ?? "")
@@ -235,6 +241,14 @@ const renderSettings = () => {
         <option value="warm" ${state.appearance.featuredStyle === "warm" ? "selected" : ""}>Warm tint</option>
       </select>
       <small>Pick a quieter look for the key column without removing emphasis.</small>
+    </div>
+    <div class="comparison-field">
+      <label for="export-size">JPG export size</label>
+      <select id="export-size" data-action="export-size">
+        <option value="wide" ${state.appearance.exportSize === "wide" ? "selected" : ""}>1464 x 600</option>
+        <option value="compact" ${state.appearance.exportSize === "compact" ? "selected" : ""}>600 x 450</option>
+      </select>
+      <small>The exported JPG uses this exact pixel size.</small>
     </div>
   `;
 };
@@ -416,18 +430,18 @@ const copySnippet = async () => {
   }
 };
 
-const showJpgResult = (dataUrl) => {
+const showJpgResult = (dataUrl, filename) => {
   comparisonJpgResult.hidden = false;
   comparisonJpgResult.innerHTML = `
     <img src="${dataUrl}" alt="Exported comparison table JPG preview" />
-    <a href="${dataUrl}" download="comparison-table.jpg">Download JPG</a>
+    <a href="${dataUrl}" download="${filename}">Download JPG</a>
   `;
 };
 
-const downloadDataUrl = (dataUrl) => {
+const downloadDataUrl = (dataUrl, filename) => {
   const link = document.createElement("a");
   link.href = dataUrl;
-  link.download = "comparison-table.jpg";
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -545,128 +559,154 @@ const drawCellBackground = (context, x, y, width, height, isFeatured) => {
   context.strokeRect(x + 2.5, y + 0.5, width - 5, height - 1);
 };
 
-const drawStatusIcon = (context, x, y, type) => {
-  const radius = 12;
+const drawStatusIcon = (context, x, y, type, radius) => {
   context.beginPath();
   context.arc(x, y, radius, 0, Math.PI * 2);
   context.fillStyle = type === "yes" ? "#648b2b" : "#b53030";
   context.fill();
 
-  context.fillStyle = "#ffffff";
-  context.font = "700 15px Arial, sans-serif";
-  context.textAlign = "center";
-  context.textBaseline = "middle";
-  context.fillText(type === "yes" ? "✓" : "×", x, y + (type === "yes" ? -1 : 0));
+  context.strokeStyle = "#ffffff";
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.lineWidth = Math.max(3, radius * 0.26);
+  context.beginPath();
+
+  if (type === "yes") {
+    context.moveTo(x - radius * 0.46, y - radius * 0.02);
+    context.lineTo(x - radius * 0.14, y + radius * 0.32);
+    context.lineTo(x + radius * 0.48, y - radius * 0.42);
+  } else {
+    context.moveTo(x - radius * 0.34, y - radius * 0.34);
+    context.lineTo(x + radius * 0.34, y + radius * 0.34);
+    context.moveTo(x + radius * 0.34, y - radius * 0.34);
+    context.lineTo(x - radius * 0.34, y + radius * 0.34);
+  }
+
+  context.stroke();
 };
 
-const renderJpgToCanvas = async () => {
-  const scale = 2;
-  const labelWidth = 220;
-  const columnWidth = 150;
-  const padding = 28;
-  const headerHeight = 126;
-  const rowHeight = 64;
-  const tableWidth = labelWidth + state.columns.length * columnWidth;
-  const tableHeight = headerHeight + state.rows.length * rowHeight;
-  const canvasWidth = tableWidth + padding * 2;
-  const canvasHeight = tableHeight + padding * 2;
+const renderJpgToCanvas = async (targetSize = getExportSize()) => {
+  const scale = 1;
+  const isCompact = targetSize.width <= 700;
+  const paddingX = isCompact ? 18 : 48;
+  const paddingY = isCompact ? 16 : 26;
+  const tableWidth = targetSize.width - paddingX * 2;
+  const tableHeight = targetSize.height - paddingY * 2;
+  const headerHeight = clamp(tableHeight * 0.2, isCompact ? 78 : 100, isCompact ? 92 : 118);
+  const rowHeight = (tableHeight - headerHeight) / Math.max(state.rows.length, 1);
+  const labelWidth = Math.round(tableWidth * (isCompact ? 0.31 : 0.28));
+  const columnWidth = (tableWidth - labelWidth) / state.columns.length;
+  const cornerRadius = isCompact ? 16 : 28;
+  const lineInset = isCompact ? 10 : 30;
+  const iconRadius = isCompact ? 8 : 20;
+  const headerFont = isCompact ? "700 10px Arial, sans-serif" : "700 23px Arial, sans-serif";
+  const labelFont = isCompact ? "700 10px Arial, sans-serif" : "700 20px Arial, sans-serif";
+  const valueFont = isCompact ? "700 10px Arial, sans-serif" : "700 21px Arial, sans-serif";
+  const headerLineHeight = isCompact ? 13 : 31;
+  const valueLineHeight = isCompact ? 12 : 25;
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
   const images = await Promise.all(state.columns.map((column) => loadCanvasImage(getColumnImage(column))));
 
-  canvas.width = canvasWidth * scale;
-  canvas.height = canvasHeight * scale;
+  canvas.width = targetSize.width * scale;
+  canvas.height = targetSize.height * scale;
   context.scale(scale, scale);
   context.fillStyle = "#f6f1e8";
-  context.fillRect(0, 0, canvasWidth, canvasHeight);
+  context.fillRect(0, 0, targetSize.width, targetSize.height);
 
   context.save();
   context.shadowColor = "rgba(82,64,36,0.10)";
-  context.shadowBlur = 22;
-  context.shadowOffsetY = 10;
-  drawRoundRect(context, padding, padding, tableWidth, tableHeight, 22);
+  context.shadowBlur = isCompact ? 14 : 26;
+  context.shadowOffsetY = isCompact ? 6 : 10;
+  drawRoundRect(context, paddingX, paddingY, tableWidth, tableHeight, cornerRadius);
   context.fillStyle = "#ffffff";
   context.fill();
   context.restore();
 
   context.save();
-  drawRoundRect(context, padding, padding, tableWidth, tableHeight, 22);
+  drawRoundRect(context, paddingX, paddingY, tableWidth, tableHeight, cornerRadius);
   context.clip();
 
   state.columns.forEach((column, index) => {
-    const x = padding + labelWidth + index * columnWidth;
+    const x = paddingX + labelWidth + index * columnWidth;
     const isFeatured = index === 0;
-    drawCellBackground(context, x, padding, columnWidth, tableHeight, isFeatured);
+    drawCellBackground(context, x, paddingY, columnWidth, tableHeight, isFeatured);
   });
 
   context.strokeStyle = "#ddd2c2";
   context.lineWidth = 1;
 
   for (let rowIndex = 0; rowIndex <= state.rows.length; rowIndex += 1) {
-    const y = padding + headerHeight + rowIndex * rowHeight;
+    const y = paddingY + headerHeight + rowIndex * rowHeight;
     context.beginPath();
-    context.moveTo(padding + 18, y);
-    context.lineTo(padding + tableWidth - 18, y);
+    context.moveTo(paddingX + lineInset, y);
+    context.lineTo(paddingX + tableWidth - lineInset, y);
     context.stroke();
   }
 
   state.columns.forEach((column, index) => {
-    const x = padding + labelWidth + index * columnWidth;
+    const x = paddingX + labelWidth + index * columnWidth;
     const centerX = x + columnWidth / 2;
     const image = images[index];
+    const imageSize = isCompact ? 26 : 54;
+    const imageTop = paddingY + (isCompact ? 10 : 18);
+    const nameTop = image ? imageTop + imageSize + (isCompact ? 7 : 14) : paddingY + headerHeight / 2;
 
     if (image) {
-      const imgSize = 52;
-      const imgX = centerX - imgSize / 2;
-      const imgY = padding + 22;
-      drawRoundRect(context, imgX, imgY, imgSize, imgSize, 14);
+      const imgX = centerX - imageSize / 2;
+      drawRoundRect(context, imgX, imageTop, imageSize, imageSize, isCompact ? 7 : 14);
       context.fillStyle = "#faf7f2";
       context.fill();
-      const ratio = Math.min(imgSize / image.width, imgSize / image.height);
+      const ratio = Math.min(imageSize / image.width, imageSize / image.height);
       const drawWidth = image.width * ratio;
       const drawHeight = image.height * ratio;
       context.drawImage(
         image,
         centerX - drawWidth / 2,
-        imgY + imgSize / 2 - drawHeight / 2,
+        imageTop + imageSize / 2 - drawHeight / 2,
         drawWidth,
         drawHeight
       );
     }
 
     context.fillStyle = column.tone === "muted" ? "#80786e" : "#25211c";
-    context.font = "700 14px Arial, sans-serif";
-    context.textBaseline = "top";
-    drawWrappedText(context, column.name, centerX, padding + (image ? 82 : 48), columnWidth - 26, 18);
+    context.font = headerFont;
+    context.textBaseline = image ? "top" : "middle";
+    const headerLines = wrapText(context, column.name, columnWidth - (isCompact ? 8 : 26));
+    const firstLineY = image ? nameTop : nameTop - ((headerLines.length - 1) * headerLineHeight) / 2;
+    context.textAlign = "center";
+    headerLines.forEach((line, lineIndex) => {
+      context.fillText(line, centerX, firstLineY + lineIndex * headerLineHeight);
+    });
   });
 
   state.rows.forEach((row, rowIndex) => {
-    const y = padding + headerHeight + rowIndex * rowHeight;
+    const y = paddingY + headerHeight + rowIndex * rowHeight;
     const centerY = y + rowHeight / 2;
 
     context.fillStyle = "#80786e";
-    context.font = "700 13px Arial, sans-serif";
+    context.font = labelFont;
     context.textAlign = "left";
     context.textBaseline = "middle";
-    context.fillText(row.label, padding + 18, centerY);
+    context.fillText(row.label, paddingX + lineInset, centerY);
 
     row.values.forEach((value, valueIndex) => {
-      const x = padding + labelWidth + valueIndex * columnWidth;
+      const x = paddingX + labelWidth + valueIndex * columnWidth;
       const centerX = x + columnWidth / 2;
 
       if (value.type === "yes" || value.type === "no") {
-        drawStatusIcon(context, centerX, centerY, value.type);
+        drawStatusIcon(context, centerX, centerY, value.type, iconRadius);
         return;
       }
 
       context.fillStyle = value.type === "muted" ? "#80786e" : "#25211c";
-      context.font = "700 14px Arial, sans-serif";
+      context.font = valueFont;
       context.textBaseline = "middle";
-      const lines = wrapText(context, value.text, columnWidth - 30);
-      const startY = centerY - ((lines.length - 1) * 18) / 2;
+      const lines = wrapText(context, value.text, columnWidth - (isCompact ? 8 : 30));
+      const startY = centerY - ((lines.length - 1) * valueLineHeight) / 2;
       context.textAlign = "center";
       lines.forEach((line, index) => {
-        context.fillText(line, centerX, startY + index * 18);
+        context.fillText(line, centerX, startY + index * valueLineHeight);
       });
     });
   });
@@ -679,11 +719,13 @@ const exportJpg = async () => {
   setStatus("Exporting");
 
   try {
-    const canvas = await renderJpgToCanvas();
+    const exportSize = getExportSize();
+    const filename = `comparison-table-${exportSize.label}.jpg`;
+    const canvas = await renderJpgToCanvas(exportSize);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
 
-    showJpgResult(dataUrl);
-    downloadDataUrl(dataUrl);
+    showJpgResult(dataUrl, filename);
+    downloadDataUrl(dataUrl, filename);
     setStatus("JPG ready");
   } catch {
     setStatus("Export failed");
@@ -736,6 +778,10 @@ const handleInput = (event) => {
 
   if (action === "featured-style") {
     state.appearance.featuredStyle = event.target.value;
+  }
+
+  if (action === "export-size") {
+    state.appearance.exportSize = event.target.value;
   }
 
   if (action === "column-name") {
